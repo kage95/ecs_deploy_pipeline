@@ -1,9 +1,10 @@
 name: Web API Deploy Pipeline
-on:
-  push:
-    paths:
-      - ".github/workflows/**"
-      - "main.go"
+on: push
+# on:
+#   push:
+#     paths:
+#       - ".github/workflows/**"
+#       - "main.go"
 
 env:
   AWS_REGION: ap-northeast-1
