@@ -12,7 +12,6 @@ env:
   ECS_REPOSITORY: ecs_deploy_pipeline
   ECS_TASK_DEFINITION_API: .aws/task-def-api.json
 
-# OpenID connectに必要な権限
 permissions:
   id-token: write
   contents: read
@@ -21,7 +20,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Set up golang
         uses: actions/setup-go@v4
@@ -38,7 +38,6 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ env.AWS_REGION }}
-          # For OpenID connect
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
 
       - name: Login to Amazon ECR
@@ -51,3 +50,50 @@ jobs:
         run: |
           docker image tag temp_api_image:latest $ECR_REGISTRY/$ECS_REPOSITORY:${{ github.sha }}
           docker image push $ECR_REGISTRY/$ECS_REPOSITORY:${{ github.sha }}
+          echo $ECR_REGISTRY/$ECS_REPOSITORY:${{ github.sha }} > api-image-uri.txt
+
+      - name: Upload the image URI file as an articact
+        uses: actions/upload-artifact@2
+        with:
+          name: api-image-uri
+          path: api-image-uri.txt
+
+  deploy:
+    runs-on: ubuntu-lates
+    needs: [test]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+
+      - name: Download the artifact
+        uses: actins/download-artifact@v2
+        with:
+          name: api-image-uri
+          path: artifacts
+
+      - name: Define the image URI
+        run: |
+          echo "API_IMAGE_URI=$(cat artifacts/api-image-uri.txt)" >> $GITHUB_ENV
+
+      - name: Fill in the new image URI in the amazon ECS task definition
+        id: render-task-def
+        uses: aws-actions/amazon-ecr-render-task-definition@1
+        with:
+          task-definition: ${{ env.ECS_TASK_DEFINITION_API }}
+          container-name: api
+          image: ${{ env.API_IMAGE_URI}}
+
+      - name: Deploy ECS task
+        uses: aws-actions/amazon-ecr-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.render-task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
