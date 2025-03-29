@@ -1,10 +1,9 @@
 name: Web API Deploy Pipeline
-on: push
-# on:
-#   push:
-#     paths:
-#       - ".github/workflows/**"
-#       - "main.go"
+on:
+  push:
+    paths:
+      - ".github/workflows/**"
+      - "main.go"
 
 env:
   AWS_REGION: ap-northeast-1
@@ -50,5 +49,5 @@ jobs:
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
-          docker image tag temp_api_image:latest $ECR_REGISTRY/$ECR_REGISTRY:${{ github.sha }}
-          docker image push $ECR_REGISTRY/$ECR_REGISTRY:${{ github.sha }}
+          docker image tag temp_api_image:latest $ECR_REGISTRY/$ECS_REPOSITORY:${{ github.sha }}
+          docker image push $ECR_REGISTRY/$ECS_REPOSITORY:${{ github.sha }}
